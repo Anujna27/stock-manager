@@ -19,4 +19,13 @@ export const fetchStockPrice = async (ticker) => {
     throw error;
   }
 };
+export async function fetchExchangeRates() {
+  const res = await fetch("/api/getExchangeRates");
+  if (!res.ok) {
+    throw new Error("Failed to fetch exchange rates");
+  }
+  return res.json();
+}
+
+
 
