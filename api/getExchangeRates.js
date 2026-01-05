@@ -1,14 +1,14 @@
 export default async function handler(req, res) {
   try {
     const response = await fetch(
-      "https://api.exchangerate.host/latest?base=USD"
+      "https://open.er-api.com/v6/latest/USD"
     );
 
-    if (!response.ok) {
-      throw new Error("Failed to fetch from exchange API");
-    }
-
     const data = await response.json();
+
+    if (data.result !== "success") {
+      throw new Error("Exchange API failed");
+    }
 
     res.status(200).json({
       USD: 1,
@@ -17,7 +17,7 @@ export default async function handler(req, res) {
       KRW: data.rates.KRW,
     });
   } catch (error) {
-    console.error("Exchange API error:", error);
-    res.status(500).json({ error: "Failed to fetch exchange rates" });
+    console.error("Exchange rate error:", error);
+    res.status(500).json({ error: "Exchange rate fetch failed" });
   }
 }
