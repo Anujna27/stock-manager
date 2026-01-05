@@ -39,7 +39,13 @@ const Dashboard = () => {
     KRW: "₩",
   };
 
-  const rate = rates[currency] || 1;
+ const rate =
+  currency === "USD"
+    ? 1
+    : rates[currency]
+    ? rates[currency]
+    : null;
+
 
   const loadStocks = useCallback(async () => {
     if (!user) return;
@@ -216,16 +222,22 @@ const Dashboard = () => {
             <div className="summary-card">
               <h3>Total Invested</h3>
               <p className="summary-value">
-                {currencySymbols[currency]}{" "}
-                {(portfolioTotals.invested * rate).toFixed(2)}
-              </p>
+  {currencySymbols[currency]}{" "}
+  {rate === null
+    ? "Loading..."
+    : (portfolioTotals.invested * rate).toFixed(2)}
+</p>
+
             </div>
 
             <div className="summary-card">
               <h3>Current Value</h3>
               <p className="summary-value">
                 {currencySymbols[currency]}{" "}
-                {(portfolioTotals.current * rate).toFixed(2)}
+{rate === null
+  ? "Loading..."
+  : (portfolioTotals.current * rate).toFixed(2)}
+
               </p>
             </div>
 
@@ -236,8 +248,11 @@ const Dashboard = () => {
                   portfolioTotals.profitLoss >= 0 ? "profit" : "loss"
                 }`}
               >
-                {currencySymbols[currency]}{" "}
-                {(portfolioTotals.profitLoss * rate).toFixed(2)} (
+               {currencySymbols[currency]}{" "}
+{rate === null
+  ? "Loading..."
+  : (portfolioTotals.profitLoss * rate).toFixed(2)}
+ (
                 {portfolioPercentage.toFixed(2)}%)
               </p>
             </div>
@@ -287,7 +302,8 @@ const Dashboard = () => {
                     <td>{stock.quantity}</td>
                     <td>
                       {currencySymbols[currency]}{" "}
-                      {(stock.buyPrice * rate).toFixed(2)}
+{rate === null ? "Loading..." : (stock.buyPrice * rate).toFixed(2)}
+
                     </td>
                     <td>
                       {stock.currentPrice
@@ -298,17 +314,21 @@ const Dashboard = () => {
                     </td>
                     <td>
                       {currencySymbols[currency]}{" "}
-                      {(invested * rate).toFixed(2)}
+{rate === null ? "Loading..." : (invested * rate).toFixed(2)}
+
+
                     </td>
                     <td>
                       {currencySymbols[currency]}{" "}
-                      {(current * rate).toFixed(2)}
+{rate === null ? "Loading..." : (current * rate).toFixed(2)}
+
                     </td>
                     <td
                       className={profitLoss >= 0 ? "profit" : "loss"}
                     >
-                      {currencySymbols[currency]}{" "}
-                      {(profitLoss * rate).toFixed(2)}
+                     {currencySymbols[currency]}{" "}
+{rate === null ? "Loading..." : (profitLoss * rate).toFixed(2)}
+
                     </td>
                     <td>
                       <button
@@ -334,4 +354,5 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
 
