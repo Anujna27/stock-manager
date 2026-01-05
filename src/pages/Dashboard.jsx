@@ -99,6 +99,14 @@ const Dashboard = () => {
       .catch((err) => console.error("Exchange rate error:", err));
   }, []);
 
+  
+  useEffect(() => {
+  console.log("Rates fetched:", rates);
+  console.log("Selected currency:", currency);
+  console.log("Current rate:", rates[currency]);
+}, [rates, currency]);
+
+
   const handleAddStock = async (e) => {
     e.preventDefault();
     setError("");
@@ -326,3 +334,4 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
