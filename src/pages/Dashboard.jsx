@@ -123,7 +123,19 @@ const rate = currency === "USD" ? 1 : rates?.[currency];
     }
 
     const qty = parseFloat(quantity);
-    const price = parseFloat(buyPrice);
+   const enteredPrice = parseFloat(buyPrice);
+
+if (!rates[currency] && currency !== "USD") {
+  setError("Exchange rates not loaded yet");
+  setAddingStock(false);
+  return;
+}
+
+const priceInUSD =
+  currency === "USD"
+    ? enteredPrice
+    : enteredPrice / rates[currency];
+
 
     if (qty <= 0 || price <= 0) {
       setError("Quantity and buy price must be greater than 0");
@@ -136,7 +148,8 @@ const rate = currency === "USD" ? 1 : rates?.[currency];
       await addStock(user.uid, {
         ticker: ticker.toUpperCase().trim(),
         quantity: qty,
-        buyPrice: price,
+        buyPrice: priceInUSD,
+
       });
       setTicker("");
       setQuantity("");
@@ -374,6 +387,7 @@ const rate = currency === "USD" ? 1 : rates?.[currency];
 };
 
 export default Dashboard;
+
 
 
 
