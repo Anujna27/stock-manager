@@ -39,12 +39,12 @@ const Dashboard = () => {
     KRW: "₩",
   };
 
- const rate =
-  currency === "USD"
-    ? 1
-    : rates[currency]
-    ? rates[currency]
-    : null;
+const rate = currency === "USD" ? 1 : rates?.[currency];
+  const convert = (value) =>
+  rate === undefined ? "Loading..." : (value * rate).toFixed(2);
+
+
+
 
 
   const loadStocks = useCallback(async () => {
@@ -220,44 +220,33 @@ const Dashboard = () => {
           </div>
 
           <div className="summary-cards">
-            <div className="summary-card">
-              <h3>Total Invested</h3>
-              <p className="summary-value">
-  {currencySymbols[currency]}{" "}
-  {rate === null
-    ? "Loading..."
-    : (portfolioTotals.invested * rate).toFixed(2)}
-</p>
+  <div className="summary-card">
+    <h3>Total Invested</h3>
+    <p className="summary-value">
+      {currencySymbols[currency]} {convert(portfolioTotals.invested)}
+    </p>
+  </div>
 
-            </div>
+  <div className="summary-card">
+    <h3>Current Value</h3>
+    <p className="summary-value">
+      {currencySymbols[currency]} {convert(portfolioTotals.current)}
+    </p>
+  </div>
 
-            <div className="summary-card">
-              <h3>Current Value</h3>
-              <p className="summary-value">
-                {currencySymbols[currency]}{" "}
-{rate === null
-  ? "Loading..."
-  : (portfolioTotals.current * rate).toFixed(2)}
+  <div className="summary-card">
+    <h3>Profit / Loss</h3>
+    <p
+      className={`summary-value ${
+        portfolioTotals.profitLoss >= 0 ? "profit" : "loss"
+      }`}
+    >
+      {currencySymbols[currency]} {convert(portfolioTotals.profitLoss)} (
+      {portfolioPercentage.toFixed(2)}%)
+    </p>
+  </div>
+</div>
 
-              </p>
-            </div>
-
-            <div className="summary-card">
-              <h3>Profit / Loss</h3>
-              <p
-                className={`summary-value ${
-                  portfolioTotals.profitLoss >= 0 ? "profit" : "loss"
-                }`}
-              >
-               {currencySymbols[currency]}{" "}
-{rate === null
-  ? "Loading..."
-  : (portfolioTotals.profitLoss * rate).toFixed(2)}
- (
-                {portfolioPercentage.toFixed(2)}%)
-              </p>
-            </div>
-          </div>
         </section>
         {/* Add Stock Form */}
 <section className="add-stock-section">
@@ -335,47 +324,41 @@ const Dashboard = () => {
 
                 return (
                   <tr key={stock.id}>
-                    <td>{stock.ticker}</td>
-                    <td>{stock.quantity}</td>
-                    <td>
-                      {currencySymbols[currency]}{" "}
-{rate === null ? "Loading..." : (stock.buyPrice * rate).toFixed(2)}
+  <td>{stock.ticker}</td>
+  <td>{stock.quantity}</td>
 
-                    </td>
-                    <td>
-                      {stock.currentPrice
-                        ? `${currencySymbols[currency]} ${(
-                            stock.currentPrice * rate
-                          ).toFixed(2)}`
-                        : "-"}
-                    </td>
-                    <td>
-                      {currencySymbols[currency]}{" "}
-{rate === null ? "Loading..." : (invested * rate).toFixed(2)}
+  <td>
+    {currencySymbols[currency]} {convert(stock.buyPrice)}
+  </td>
 
+  <td>
+    {stock.currentPrice
+      ? `${currencySymbols[currency]} ${convert(stock.currentPrice)}`
+      : "-"}
+  </td>
 
-                    </td>
-                    <td>
-                      {currencySymbols[currency]}{" "}
-{rate === null ? "Loading..." : (current * rate).toFixed(2)}
+  <td>
+    {currencySymbols[currency]} {convert(invested)}
+  </td>
 
-                    </td>
-                    <td
-                      className={profitLoss >= 0 ? "profit" : "loss"}
-                    >
-                     {currencySymbols[currency]}{" "}
-{rate === null ? "Loading..." : (profitLoss * rate).toFixed(2)}
+  <td>
+    {currencySymbols[currency]} {convert(current)}
+  </td>
 
-                    </td>
-                    <td>
-                      <button
-                        onClick={() => handleDeleteStock(stock.id)}
-                        className="delete-button"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
+  <td className={profitLoss >= 0 ? "profit" : "loss"}>
+    {currencySymbols[currency]} {convert(profitLoss)}
+  </td>
+
+  <td>
+    <button
+      onClick={() => handleDeleteStock(stock.id)}
+      className="delete-button"
+    >
+      Delete
+    </button>
+  </td>
+</tr>
+
                 );
               })}
             </tbody>
@@ -391,6 +374,7 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
 
 
 
