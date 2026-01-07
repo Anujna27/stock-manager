@@ -39,9 +39,10 @@ const Dashboard = () => {
     KRW: "₩",
   };
 
-  // Always store data in USD. Conversion is DISPLAY ONLY.
-  const rate = currency === "USD" ? 1 : rates[currency] || 1;
-  const convert = (value) => (value * rate).toFixed(2);
+  // conversion helpers
+  const rate = currency === "USD" ? 1 : rates[currency];
+  const convertToDisplay = (value) =>
+    rate ? (value * rate).toFixed(2) : "Loading...";
 
   // ---------------- LOAD DATA ----------------
 
@@ -51,7 +52,7 @@ const Dashboard = () => {
       setLoading(true);
       const data = await getStocks(user.uid);
       setStocks(data);
-    } catch (err) {
+    } catch {
       setError("Failed to load stocks");
     } finally {
       setLoading(false);
@@ -104,21 +105,32 @@ const Dashboard = () => {
     }
 
     const qty = parseFloat(quantity);
-    const priceUSD = parseFloat(buyPrice);
+    const enteredPrice = parseFloat(buyPrice);
 
-    if (qty <= 0 || priceUSD <= 0) {
-      setError("Quantity and buy price must be > 0");
+    if (qty <= 0 || enteredPrice <= 0) {
+      setError("Quantity and buy price must be greater than 0");
       return;
     }
+
+    if (currency !== "USD" && !rates[currency]) {
+      setError("Exchange rates not loaded yet");
+      return;
+    }
+
+    // 🔑 convert selected currency → USD
+    const priceInUSD =
+      currency === "USD"
+        ? enteredPrice
+        : enteredPrice / rates[currency];
 
     setAddingStock(true);
     try {
       await fetchStockPrice(ticker); // validate ticker
 
       await addStock(user.uid, {
-        ticker: ticker.toUpperCase(),
+        ticker: ticker.toUpperCase().trim(),
         quantity: qty,
-        buyPrice: priceUSD, // ✅ ALWAYS USD
+        buyPrice: priceInUSD, // STORED IN USD
       });
 
       setTicker("");
@@ -197,16 +209,27 @@ const Dashboard = () => {
           <div className="summary-cards">
             <div>
               <h3>Total Invested</h3>
-              <p>{currencySymbols[currency]} {convert(portfolioTotals.invested)}</p>
+              <p>
+                {currencySymbols[currency]}{" "}
+                {convertToDisplay(portfolioTotals.invested)}
+              </p>
             </div>
             <div>
               <h3>Current Value</h3>
-              <p>{currencySymbols[currency]} {convert(portfolioTotals.current)}</p>
+              <p>
+                {currencySymbols[currency]}{" "}
+                {convertToDisplay(portfolioTotals.current)}
+              </p>
             </div>
             <div>
               <h3>Profit / Loss</h3>
-              <p className={portfolioTotals.profitLoss >= 0 ? "profit" : "loss"}>
-                {currencySymbols[currency]} {convert(portfolioTotals.profitLoss)} (
+              <p
+                className={
+                  portfolioTotals.profitLoss >= 0 ? "profit" : "loss"
+                }
+              >
+                {currencySymbols[currency]}{" "}
+                {convertToDisplay(portfolioTotals.profitLoss)} (
                 {portfolioPercent.toFixed(2)}%)
               </p>
             </div>
@@ -214,12 +237,26 @@ const Dashboard = () => {
         </section>
 
         {/* Add Stock */}
-        <section>
-          <h2>Add Stock (USD)</h2>
+        <section className="add-stock-section">
+          <h2>Add Stock ({currency})</h2>
           <form onSubmit={handleAddStock}>
-            <input placeholder="Ticker" value={ticker} onChange={e => setTicker(e.target.value)} />
-            <input placeholder="Quantity" type="number" value={quantity} onChange={e => setQuantity(e.target.value)} />
-            <input placeholder="Buy Price (USD)" type="number" value={buyPrice} onChange={e => setBuyPrice(e.target.value)} />
+            <input
+              placeholder="Ticker (e.g. AAPL)"
+              value={ticker}
+              onChange={(e) => setTicker(e.target.value)}
+            />
+            <input
+              type="number"
+              placeholder="Quantity"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+            />
+            <input
+              type="number"
+              placeholder={`Buy Price (${currency})`}
+              value={buyPrice}
+              onChange={(e) => setBuyPrice(e.target.value)}
+            />
             <button disabled={addingStock}>
               {addingStock ? "Adding..." : "Add Stock"}
             </button>
@@ -242,7 +279,10 @@ const Dashboard = () => {
           </thead>
           <tbody>
             {stocks.map((s) => {
-              const invested = calculateInvestedAmount(s.quantity, s.buyPrice);
+              const invested = calculateInvestedAmount(
+                s.quantity,
+                s.buyPrice
+              );
               const current = s.currentPrice
                 ? calculateCurrentValue(s.quantity, s.currentPrice)
                 : 0;
@@ -252,15 +292,33 @@ const Dashboard = () => {
                 <tr key={s.id}>
                   <td>{s.ticker}</td>
                   <td>{s.quantity}</td>
-                  <td>{currencySymbols[currency]} {convert(s.buyPrice)}</td>
-                  <td>{s.currentPrice ? currencySymbols[currency] + " " + convert(s.currentPrice) : "-"}</td>
-                  <td>{currencySymbols[currency]} {convert(invested)}</td>
-                  <td>{currencySymbols[currency]} {convert(current)}</td>
-                  <td className={pl >= 0 ? "profit" : "loss"}>
-                    {currencySymbols[currency]} {convert(pl)}
+                  <td>
+                    {currencySymbols[currency]}{" "}
+                    {convertToDisplay(s.buyPrice)}
                   </td>
                   <td>
-                    <button onClick={() => handleDeleteStock(s.id)}>Delete</button>
+                    {s.currentPrice
+                      ? `${currencySymbols[currency]} ${convertToDisplay(
+                          s.currentPrice
+                        )}`
+                      : "-"}
+                  </td>
+                  <td>
+                    {currencySymbols[currency]}{" "}
+                    {convertToDisplay(invested)}
+                  </td>
+                  <td>
+                    {currencySymbols[currency]}{" "}
+                    {convertToDisplay(current)}
+                  </td>
+                  <td className={pl >= 0 ? "profit" : "loss"}>
+                    {currencySymbols[currency]}{" "}
+                    {convertToDisplay(pl)}
+                  </td>
+                  <td>
+                    <button onClick={() => handleDeleteStock(s.id)}>
+                      Delete
+                    </button>
                   </td>
                 </tr>
               );
