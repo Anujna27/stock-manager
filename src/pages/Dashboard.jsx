@@ -203,6 +203,7 @@ const Dashboard = () => {
         {/* Portfolio Summary */}
         <section className="portfolio-summary">
           <h2>Portfolio Summary</h2>
+          
 
           {/* Currency Selector */}
           <div style={{ marginBottom: "10px" }}>
@@ -258,6 +259,42 @@ const Dashboard = () => {
             </div>
           </div>
         </section>
+        {/* Add Stock Form */}
+<section className="add-stock-section">
+  <h2>Add Stock</h2>
+  <form onSubmit={handleAddStock} className="add-stock-form">
+    <input
+      type="text"
+      placeholder="Ticker (e.g., AAPL)"
+      value={ticker}
+      onChange={(e) => setTicker(e.target.value.toUpperCase())}
+      required
+      maxLength="10"
+    />
+    <input
+      type="number"
+      placeholder="Quantity"
+      value={quantity}
+      onChange={(e) => setQuantity(e.target.value)}
+      required
+      min="0.01"
+      step="0.01"
+    />
+    <input
+      type="number"
+      placeholder="Buy Price (USD)"
+      value={buyPrice}
+      onChange={(e) => setBuyPrice(e.target.value)}
+      required
+      min="0.01"
+      step="0.01"
+    />
+    <button type="submit" disabled={addingStock} className="add-button">
+      {addingStock ? "Adding..." : "Add Stock"}
+    </button>
+  </form>
+</section>
+
 
         {/* Stocks Table */}
         <section className="stocks-section">
@@ -354,5 +391,6 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
 
 
