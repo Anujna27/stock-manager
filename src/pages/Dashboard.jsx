@@ -22,13 +22,13 @@ const Dashboard = () => {
   const [pricesLoading, setPricesLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Add stock form state
+  // Add stock form
   const [ticker, setTicker] = useState("");
   const [quantity, setQuantity] = useState("");
   const [buyPrice, setBuyPrice] = useState("");
   const [addingStock, setAddingStock] = useState(false);
 
-  // Currency state
+  // Currency
   const [currency, setCurrency] = useState("USD");
   const [rates, setRates] = useState({});
 
@@ -39,79 +39,60 @@ const Dashboard = () => {
     KRW: "₩",
   };
 
-const rate = currency === "USD" ? 1 : rates?.[currency];
-  const convert = (value) =>
-  rate === undefined ? "Loading..." : (value * rate).toFixed(2);
+  // Always store data in USD. Conversion is DISPLAY ONLY.
+  const rate = currency === "USD" ? 1 : rates[currency] || 1;
+  const convert = (value) => (value * rate).toFixed(2);
 
-
-
-
+  // ---------------- LOAD DATA ----------------
 
   const loadStocks = useCallback(async () => {
     if (!user) return;
     try {
       setLoading(true);
-      const userStocks = await getStocks(user.uid);
-      setStocks(userStocks);
+      const data = await getStocks(user.uid);
+      setStocks(data);
     } catch (err) {
-      setError("Failed to load stocks: " + err.message);
+      setError("Failed to load stocks");
     } finally {
       setLoading(false);
     }
   }, [user]);
 
-  const fetchAllPrices = useCallback(async (stocksToFetch) => {
-    if (!stocksToFetch || stocksToFetch.length === 0) return;
+  const fetchAllPrices = useCallback(async (list) => {
+    if (!list.length) return;
     setPricesLoading(true);
     try {
-      const updatedStocks = await Promise.all(
-        stocksToFetch.map(async (stock) => {
+      const updated = await Promise.all(
+        list.map(async (stock) => {
           try {
             const priceData = await fetchStockPrice(stock.ticker);
-            return { ...stock, currentPrice: priceData.price, priceError: null };
-          } catch (err) {
-            return { ...stock, currentPrice: null, priceError: err.message };
+            return { ...stock, currentPrice: priceData.price };
+          } catch {
+            return { ...stock, currentPrice: null };
           }
         })
       );
-      setStocks(updatedStocks);
+      setStocks(updated);
     } finally {
       setPricesLoading(false);
     }
   }, []);
 
-  // Load stocks
   useEffect(() => {
     loadStocks();
   }, [loadStocks]);
 
-  // Fetch prices once
   useEffect(() => {
-    if (
-      stocks.length > 0 &&
-      !loading &&
-      stocks.every(
-        (s) => s.currentPrice === undefined && s.priceError === undefined
-      )
-    ) {
+    if (!loading && stocks.length) {
       fetchAllPrices(stocks);
     }
-  }, [stocks.length, loading, fetchAllPrices]);
+  }, [loading]);
 
-  // Fetch exchange rates
   useEffect(() => {
-    fetchExchangeRates()
-      .then(setRates)
-      .catch((err) => console.error("Exchange rate error:", err));
+    fetchExchangeRates().then(setRates).catch(() => {});
   }, []);
 
-  
-  useEffect(() => {
-  console.log("Rates fetched:", rates);
-  console.log("Selected currency:", currency);
-  console.log("Current rate:", rates[currency]);
-}, [rates, currency]);
-
+  // ---------------- ACTIONS ----------------
 
   const handleAddStock = async (e) => {
     e.preventDefault();
@@ -123,48 +104,37 @@ const rate = currency === "USD" ? 1 : rates?.[currency];
     }
 
     const qty = parseFloat(quantity);
-   const enteredPrice = parseFloat(buyPrice);
+    const priceUSD = parseFloat(buyPrice);
 
-if (!rates[currency] && currency !== "USD") {
-  setError("Exchange rates not loaded yet");
-  setAddingStock(false);
-  return;
-}
-
-const priceInUSD =
-  currency === "USD"
-    ? enteredPrice
-    : enteredPrice / rates[currency];
-
-
-    if (qty <= 0 || price <= 0) {
-      setError("Quantity and buy price must be greater than 0");
+    if (qty <= 0 || priceUSD <= 0) {
+      setError("Quantity and buy price must be > 0");
       return;
     }
 
     setAddingStock(true);
     try {
-      await fetchStockPrice(ticker);
-      await addStock(user.uid, {
-        ticker: ticker.toUpperCase().trim(),
-        quantity: qty,
-        buyPrice: priceInUSD,
+      await fetchStockPrice(ticker); // validate ticker
 
+      await addStock(user.uid, {
+        ticker: ticker.toUpperCase(),
+        quantity: qty,
+        buyPrice: priceUSD, // ✅ ALWAYS USD
       });
+
       setTicker("");
       setQuantity("");
       setBuyPrice("");
       await loadStocks();
-    } catch (err) {
-      setError(err.message || "Failed to add stock");
+    } catch {
+      setError("Failed to add stock");
     } finally {
       setAddingStock(false);
     }
   };
 
-  const handleDeleteStock = async (stockId) => {
+  const handleDeleteStock = async (id) => {
     if (!window.confirm("Delete this stock?")) return;
-    await deleteStock(user.uid, stockId);
+    await deleteStock(user.uid, id);
     await loadStocks();
   };
 
@@ -173,24 +143,24 @@ const priceInUSD =
     navigate("/login");
   };
 
-  // Portfolio totals (USD base)
+  // ---------------- CALCULATIONS ----------------
+
   const portfolioTotals = stocks.reduce(
-    (acc, stock) => {
-      const invested = calculateInvestedAmount(stock.quantity, stock.buyPrice);
-      const current = stock.currentPrice
-        ? calculateCurrentValue(stock.quantity, stock.currentPrice)
+    (acc, s) => {
+      const invested = calculateInvestedAmount(s.quantity, s.buyPrice);
+      const current = s.currentPrice
+        ? calculateCurrentValue(s.quantity, s.currentPrice)
         : 0;
-      const profitLoss = calculateProfitLoss(current, invested);
       return {
         invested: acc.invested + invested,
         current: acc.current + current,
-        profitLoss: acc.profitLoss + profitLoss,
+        profitLoss: acc.profitLoss + (current - invested),
       };
     },
     { invested: 0, current: 0, profitLoss: 0 }
   );
 
-  const portfolioPercentage =
+  const portfolioPercent =
     portfolioTotals.invested > 0
       ? calculateProfitLossPercentage(
           portfolioTotals.profitLoss,
@@ -198,15 +168,15 @@ const priceInUSD =
         )
       : 0;
 
+  // ---------------- UI ----------------
+
   return (
     <div className="dashboard-container">
       <header className="dashboard-header">
         <h1>Stock Portfolio Manager</h1>
         <div className="header-actions">
-          <span className="user-email">{user?.email}</span>
-          <button onClick={handleLogout} className="logout-button">
-            Logout
-          </button>
+          <span>{user?.email}</span>
+          <button onClick={handleLogout}>Logout</button>
         </div>
       </header>
 
@@ -216,179 +186,90 @@ const priceInUSD =
         {/* Portfolio Summary */}
         <section className="portfolio-summary">
           <h2>Portfolio Summary</h2>
-          
 
-          {/* Currency Selector */}
-          <div style={{ marginBottom: "10px" }}>
-            <label style={{ marginRight: "8px" }}>Currency:</label>
-            <select
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-            >
-              <option value="USD">USD ($)</option>
-              <option value="INR">INR (₹)</option>
-              <option value="EUR">EUR (€)</option>
-              <option value="KRW">KRW (₩)</option>
-            </select>
-          </div>
+          <select value={currency} onChange={(e) => setCurrency(e.target.value)}>
+            <option value="USD">USD ($)</option>
+            <option value="INR">INR (₹)</option>
+            <option value="EUR">EUR (€)</option>
+            <option value="KRW">KRW (₩)</option>
+          </select>
 
           <div className="summary-cards">
-  <div className="summary-card">
-    <h3>Total Invested</h3>
-    <p className="summary-value">
-      {currencySymbols[currency]} {convert(portfolioTotals.invested)}
-    </p>
-  </div>
-
-  <div className="summary-card">
-    <h3>Current Value</h3>
-    <p className="summary-value">
-      {currencySymbols[currency]} {convert(portfolioTotals.current)}
-    </p>
-  </div>
-
-  <div className="summary-card">
-    <h3>Profit / Loss</h3>
-    <p
-      className={`summary-value ${
-        portfolioTotals.profitLoss >= 0 ? "profit" : "loss"
-      }`}
-    >
-      {currencySymbols[currency]} {convert(portfolioTotals.profitLoss)} (
-      {portfolioPercentage.toFixed(2)}%)
-    </p>
-  </div>
-</div>
-
+            <div>
+              <h3>Total Invested</h3>
+              <p>{currencySymbols[currency]} {convert(portfolioTotals.invested)}</p>
+            </div>
+            <div>
+              <h3>Current Value</h3>
+              <p>{currencySymbols[currency]} {convert(portfolioTotals.current)}</p>
+            </div>
+            <div>
+              <h3>Profit / Loss</h3>
+              <p className={portfolioTotals.profitLoss >= 0 ? "profit" : "loss"}>
+                {currencySymbols[currency]} {convert(portfolioTotals.profitLoss)} (
+                {portfolioPercent.toFixed(2)}%)
+              </p>
+            </div>
+          </div>
         </section>
-        {/* Add Stock Form */}
-<section className="add-stock-section">
-  <h2>Add Stock</h2>
-  <form onSubmit={handleAddStock} className="add-stock-form">
-    <input
-      type="text"
-      placeholder="Ticker (e.g., AAPL)"
-      value={ticker}
-      onChange={(e) => setTicker(e.target.value.toUpperCase())}
-      required
-      maxLength="10"
-    />
-    <input
-      type="number"
-      placeholder="Quantity"
-      value={quantity}
-      onChange={(e) => setQuantity(e.target.value)}
-      required
-      min="0.01"
-      step="0.01"
-    />
-    <input
-      type="number"
-      placeholder="Buy Price (USD)"
-      value={buyPrice}
-      onChange={(e) => setBuyPrice(e.target.value)}
-      required
-      min="0.01"
-      step="0.01"
-    />
-    <button type="submit" disabled={addingStock} className="add-button">
-      {addingStock ? "Adding..." : "Add Stock"}
-    </button>
-  </form>
-</section>
 
+        {/* Add Stock */}
+        <section>
+          <h2>Add Stock (USD)</h2>
+          <form onSubmit={handleAddStock}>
+            <input placeholder="Ticker" value={ticker} onChange={e => setTicker(e.target.value)} />
+            <input placeholder="Quantity" type="number" value={quantity} onChange={e => setQuantity(e.target.value)} />
+            <input placeholder="Buy Price (USD)" type="number" value={buyPrice} onChange={e => setBuyPrice(e.target.value)} />
+            <button disabled={addingStock}>
+              {addingStock ? "Adding..." : "Add Stock"}
+            </button>
+          </form>
+        </section>
 
         {/* Stocks Table */}
-        <section className="stocks-section">
-          <div className="stocks-header">
-            <h2>Your Stocks</h2>
-            <button
-              onClick={() => fetchAllPrices(stocks)}
-              className="refresh-button"
-              disabled={pricesLoading}
-            >
-              {pricesLoading ? "Refreshing..." : "Refresh Prices"}
-            </button>
-          </div>
+        <table className="stocks-table">
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th>Qty</th>
+              <th>Buy</th>
+              <th>Current</th>
+              <th>Invested</th>
+              <th>Value</th>
+              <th>P/L</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {stocks.map((s) => {
+              const invested = calculateInvestedAmount(s.quantity, s.buyPrice);
+              const current = s.currentPrice
+                ? calculateCurrentValue(s.quantity, s.currentPrice)
+                : 0;
+              const pl = current - invested;
 
-          <table className="stocks-table">
-            <thead>
-              <tr>
-                <th>Ticker</th>
-                <th>Qty</th>
-                <th>Buy Price</th>
-                <th>Current Price</th>
-                <th>Invested</th>
-                <th>Current Value</th>
-                <th>Profit/Loss</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {stocks.map((stock) => {
-                const invested = calculateInvestedAmount(
-                  stock.quantity,
-                  stock.buyPrice
-                );
-                const current = stock.currentPrice
-                  ? calculateCurrentValue(stock.quantity, stock.currentPrice)
-                  : 0;
-                const profitLoss = calculateProfitLoss(current, invested);
-
-                return (
-                  <tr key={stock.id}>
-  <td>{stock.ticker}</td>
-  <td>{stock.quantity}</td>
-
-  <td>
-    {currencySymbols[currency]} {convert(stock.buyPrice)}
-  </td>
-
-  <td>
-    {stock.currentPrice
-      ? `${currencySymbols[currency]} ${convert(stock.currentPrice)}`
-      : "-"}
-  </td>
-
-  <td>
-    {currencySymbols[currency]} {convert(invested)}
-  </td>
-
-  <td>
-    {currencySymbols[currency]} {convert(current)}
-  </td>
-
-  <td className={profitLoss >= 0 ? "profit" : "loss"}>
-    {currencySymbols[currency]} {convert(profitLoss)}
-  </td>
-
-  <td>
-    <button
-      onClick={() => handleDeleteStock(stock.id)}
-      className="delete-button"
-    >
-      Delete
-    </button>
-  </td>
-</tr>
-
-                );
-              })}
-            </tbody>
-          </table>
-        </section>
-
-        <div className="disclaimer">
-          ⚠️ Prices may be delayed. For reference only.
-        </div>
+              return (
+                <tr key={s.id}>
+                  <td>{s.ticker}</td>
+                  <td>{s.quantity}</td>
+                  <td>{currencySymbols[currency]} {convert(s.buyPrice)}</td>
+                  <td>{s.currentPrice ? currencySymbols[currency] + " " + convert(s.currentPrice) : "-"}</td>
+                  <td>{currencySymbols[currency]} {convert(invested)}</td>
+                  <td>{currencySymbols[currency]} {convert(current)}</td>
+                  <td className={pl >= 0 ? "profit" : "loss"}>
+                    {currencySymbols[currency]} {convert(pl)}
+                  </td>
+                  <td>
+                    <button onClick={() => handleDeleteStock(s.id)}>Delete</button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </main>
     </div>
   );
 };
 
 export default Dashboard;
-
-
-
-
-
